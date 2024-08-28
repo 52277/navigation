@@ -15,13 +15,24 @@ namespace move_base {
     tf_(tf),
     as_(NULL),
     planner_costmap_ros_(NULL), controller_costmap_ros_(NULL),
-    bgp_loader_("nav_core", "nav_core::BaseGlobalPlanner"),
-    blp_loader_("nav_core", "nav_core::BaseLocalPlanner"),
-    recovery_loader_("nav_core", "nav_core::RecoveryBehavior"),
+    bgp_loader_("nav_core", "nav_core::BaseGlobalPlanner"), //加载了baseGlobalPlanner的类库
+    blp_loader_("nav_core", "nav_core::BaseLocalPlanner"),  //加载了baseLocalPlanner的类库
+    recovery_loader_("nav_core", "nav_core::RecoveryBehavior"), //加载了recoveryBehavior的类库
     planner_plan_(NULL), latest_plan_(NULL), controller_plan_(NULL),
     runPlanner_(false), setup_(false), p_freq_change_(false), c_freq_change_(false), new_global_plan_(false) {
 
+    //新建action服务器----------------------------------------------------------------------------------------------
     as_ = new MoveBaseActionServer(ros::NodeHandle(), "move_base", [this](auto& goal){ executeCb(goal); }, false);
+    //as_ 是一个指向 MoveBaseActionServer 对象的指针。使用 new 操作符在堆上分配内存并创建一个 MoveBaseActionServer 实例。
+    //"move_base" 是动作服务器的名称。其他 ROS 节点可以通过这个名字来与该动作服务器进行通信。
+    //[this](auto& goal){ executeCb(goal); }这是一个 C++11 的 Lambda 表达式，用于指定动作服务器接收到目标（goal）时的回调函数。
+    //[this] 捕获当前对象的 this 指针，以便在 Lambda 表达式内部可以访问类的成员函数和变量。
+    //auto& goal 表示回调函数的参数是一个对目标的引用，goal 的类型由 auto 关键字自动推导。
+    //{ executeCb(goal); } 是回调函数的主体，当接收到目标时会调用类的 executeCb 函数，并将 goal 传递给它。
+    //move_base节点接收到目标时会调用 executeCb 函数，触发全局规划线程，循环执行局部规划
+    //最后的 false 参数表示在创建动作服务器时不会立即启动它。可以稍后通过调用 as_->start() 来启动服务器。
+    //也就是需要手动启动参数服务器
+    //新建action服务器-----------------------------------------------------------------------------------------------
 
     ros::NodeHandle private_nh("~");
     ros::NodeHandle nh;
