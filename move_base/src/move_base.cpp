@@ -78,26 +78,50 @@ namespace move_base {
     private_nh.param("make_plan_add_unreachable_goal", make_plan_add_unreachable_goal_, true);
 
     //set up plan triple buffer
+    //设置三重缓冲区
+    //存储由路径规划生成的路径
     planner_plan_ = new std::vector<geometry_msgs::PoseStamped>();
+    //存储最新的路径
     latest_plan_ = new std::vector<geometry_msgs::PoseStamped>();
+    //存储控制器使用的路径
     controller_plan_ = new std::vector<geometry_msgs::PoseStamped>();
 
     //set up the planner's thread
+    //设置规划器的线程
     planner_thread_ = new boost::thread(boost::bind(&MoveBase::planThread, this));
+    //将 MoveBase 类的成员函数 planThread 绑定到当前对象 this 上。这意味着 planThread 函数将在当前对象的上下文中执行。
+    //planThread函数会在新的线程中运行，这允许路径规划功能在后台异步执行，不会阻塞主线程。
+    //planThread函数是全局规划线程，会调用全局规划
+    //确保机器人在规划路径的同时继续执行其他任务，如接收传感器数据或发布控制命令。
+    //为全局规划创建一个独立的新的线程，保证了规划的过程中其他进程不受影响。
 
     //for commanding the base
+    //用于指挥base底盘
+    //创建发布者发布各种控制指令
+    //向话题cmd_vel发布消息，消息类型是geometry_msgs::Twist，1是消息队列的长度
     vel_pub_ = nh.advertise<geometry_msgs::Twist>("cmd_vel", 1);
+    //发布当前的目标位置
     current_goal_pub_ = private_nh.advertise<geometry_msgs::PoseStamped>("current_goal", 0 );
 
+    //创建了一个命名空间为 "move_base" 的 ROS 节点句柄 action_nh。
     ros::NodeHandle action_nh("move_base");
+    //发送目标动作
     action_goal_pub_ = action_nh.advertise<move_base_msgs::MoveBaseActionGoal>("goal", 1);
+    //发布恢复行为的状态
     recovery_status_pub_= action_nh.advertise<move_base_msgs::RecoveryStatus>("recovery_status", 1);
 
     //we'll provide a mechanism for some people to send goals as PoseStamped messages over a topic
     //they won't get any useful information back about its status, but this is useful for tools
     //like nav_view and rviz
+    //创建节点句柄
     ros::NodeHandle simple_nh("move_base_simple");
     goal_sub_ = simple_nh.subscribe<geometry_msgs::PoseStamped>("goal", 1, [this](auto& goal){ goalCB(goal); });
+    //goal_sub_ 是一个 ros::Subscriber 对象，用于订阅 ROS 话题。
+    //<geometry_msgs::PoseStamped>是订阅的话题消息类型
+    //话题名称为goal，消息队列的长度为1
+    //[this](auto& goal){ goalCB(goal); }是一个 C++11 的 Lambda 表达式，用于指定订阅到的消息的回调函数。
+    //捕获了 this 指针并调用类的成员函数 goalCB(goal)，传递接收到的 goal 消息。
+    //goal_sub_ 用于接收导航的目标，并将其传递给goalCB回调函数处理。
 
     //we'll assume the radius of the robot to be consistent with what's specified for the costmaps
     private_nh.param("local_costmap/inscribed_radius", inscribed_radius_, 0.325);
