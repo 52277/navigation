@@ -34,28 +34,47 @@ namespace move_base {
     //也就是需要手动启动参数服务器
     //新建action服务器-----------------------------------------------------------------------------------------------
 
+    //使用 "~" 符号表示当前节点的私有命名空间。这意味着这个 NodeHandle 对象将用于访问特定于该节点的私有参数。
     ros::NodeHandle private_nh("~");
+    //这里创建了一个全局的 NodeHandle，它可以用于访问公共命名空间中的主题、服务和参数。
     ros::NodeHandle nh;
 
-    recovery_trigger_ = PLANNING_R;
+    recovery_trigger_ = PLANNING_R;//初始化
 
     //get some parameters that will be global to the move base node
+    //获取move_base节点的全局参数
+    //private_nh.param()函数用于从参数服务器中获取参数的值，有三个参数：
+    //第一个参数是参数的名称，第二个参数是用于存储参数值的变量，第三个参数是参数的默认值，如果参数服务器中没有对应的参数，就使用默认值。
     std::string global_planner, local_planner;
+    //获取全局规划器的名称，默认是navfn/NavfnROS
     private_nh.param("base_global_planner", global_planner, std::string("navfn/NavfnROS"));
+    //获取局部规划器的名称，默认值是base_local_planner/TrajectoryPlannerROS
     private_nh.param("base_local_planner", local_planner, std::string("base_local_planner/TrajectoryPlannerROS"));
+    //获取机器人基础坐标系的名称，默认值是base_link
     private_nh.param("global_costmap/robot_base_frame", robot_base_frame_, std::string("base_link"));
+    //获取全局坐标系的名称，默认值是map
     private_nh.param("global_costmap/global_frame", global_frame_, std::string("map"));
+    //获取规划器的频率，默认值是0.0，也就是需要后续自定义频率
     private_nh.param("planner_frequency", planner_frequency_, 0.0);
+    //获取控制器的频率，默认值是20.0
     private_nh.param("controller_frequency", controller_frequency_, 20.0);
+    //获取规划器的耐心时间，默认值是5.0
     private_nh.param("planner_patience", planner_patience_, 5.0);
+    //获取控制器的耐心时间，默认值是15.0
     private_nh.param("controller_patience", controller_patience_, 15.0);
+    //获取最大规划重试次数，默认值是-1，表示不可以重新规划也就是禁用，disabled by default 默认禁用
     private_nh.param("max_planning_retries", max_planning_retries_, -1);  // disabled by default
 
+    //获取摆动超时时间，默认值是0.0，表示禁用
     private_nh.param("oscillation_timeout", oscillation_timeout_, 0.0);
+    //获取摆动距离，默认值是0.5
     private_nh.param("oscillation_distance", oscillation_distance_, 0.5);
 
     // parameters of make_plan service
+    //获取make_plan服务的相关参数
+    //在生成路径之前是否要清除代价地图，默认值是true
     private_nh.param("make_plan_clear_costmap", make_plan_clear_costmap_, true);
+    //在路径规划中包含不可达到的目标，默认值是true
     private_nh.param("make_plan_add_unreachable_goal", make_plan_add_unreachable_goal_, true);
 
     //set up plan triple buffer
