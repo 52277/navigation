@@ -1,12 +1,9 @@
 #include <move_base/move_base.h>
 #include <move_base_msgs/RecoveryStatus.h>
 #include <cmath>
-
 #include <boost/algorithm/string.hpp>
 #include <boost/thread.hpp>
-
 #include <geometry_msgs/Twist.h>
-
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 //命名空间
