@@ -1,40 +1,3 @@
-/*********************************************************************
-*
-* Software License Agreement (BSD License)
-*
-*  Copyright (c) 2008, Willow Garage, Inc.
-*  All rights reserved.
-*
-*  Redistribution and use in source and binary forms, with or without
-*  modification, are permitted provided that the following conditions
-*  are met:
-*
-*   * Redistributions of source code must retain the above copyright
-*     notice, this list of conditions and the following disclaimer.
-*   * Redistributions in binary form must reproduce the above
-*     copyright notice, this list of conditions and the following
-*     disclaimer in the documentation and/or other materials provided
-*     with the distribution.
-*   * Neither the name of the Willow Garage nor the names of its
-*     contributors may be used to endorse or promote products derived
-*     from this software without specific prior written permission.
-*
-*  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-*  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-*  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-*  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-*  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-*  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-*  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-*  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-*  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-*  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-*  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-*  POSSIBILITY OF SUCH DAMAGE.
-*
-* Author: Eitan Marder-Eppstein
-*         Mike Phillips (put the planner in its own thread)
-*********************************************************************/
 #include <move_base/move_base.h>
 #include <move_base_msgs/RecoveryStatus.h>
 #include <cmath>
@@ -46,8 +9,11 @@
 
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
+//命名空间
 namespace move_base {
 
+  //---------------------------------------------------------------------------------------------
+  //构造函数：初始化Action服务器
   MoveBase::MoveBase(tf2_ros::Buffer& tf) :
     tf_(tf),
     as_(NULL),
@@ -179,6 +145,7 @@ namespace move_base {
     dsrv_->setCallback(cb);
   }
 
+  //---------------------------------------------------------------------------------------------
   void MoveBase::reconfigureCB(move_base::MoveBaseConfig &config, uint32_t level){
     boost::recursive_mutex::scoped_lock l(configuration_mutex_);
 
@@ -272,6 +239,7 @@ namespace move_base {
     last_config_ = config;
   }
 
+  //--------------------------------------------------------------------------------------------
   void MoveBase::goalCB(const geometry_msgs::PoseStamped::ConstPtr& goal){
     ROS_DEBUG_NAMED("move_base","In ROS goal callback, wrapping the PoseStamped in the action message and re-sending to the server.");
     move_base_msgs::MoveBaseActionGoal action_goal;
@@ -281,6 +249,7 @@ namespace move_base {
     action_goal_pub_.publish(action_goal);
   }
 
+  //--------------------------------------------------------------------------------------------
   void MoveBase::clearCostmapWindows(double size_x, double size_y){
     geometry_msgs::PoseStamped global_pose;
 
@@ -336,6 +305,7 @@ namespace move_base {
     controller_costmap_ros_->getCostmap()->setConvexPolygonCost(clear_poly, costmap_2d::FREE_SPACE);
   }
 
+  //-----------------------------------------------------------------------------------------------------
   bool MoveBase::clearCostmapsService(std_srvs::Empty::Request &req, std_srvs::Empty::Response &resp){
     //clear the costmaps
     boost::unique_lock<costmap_2d::Costmap2D::mutex_t> lock_controller(*(controller_costmap_ros_->getCostmap()->getMutex()));
@@ -347,6 +317,7 @@ namespace move_base {
   }
 
 
+  //-----------------------------------------------------------------------------------------------------
   bool MoveBase::planService(nav_msgs::GetPlan::Request &req, nav_msgs::GetPlan::Response &resp){
     if(as_->isActive()){
       ROS_ERROR("move_base must be in an inactive state to make a plan for an external user");
@@ -444,6 +415,7 @@ namespace move_base {
     return true;
   }
 
+  //-------------------------------------------------------------------------------------------
   MoveBase::~MoveBase(){
     recovery_behaviors_.clear();
 
@@ -470,7 +442,8 @@ namespace move_base {
     planner_.reset();
     tc_.reset();
   }
-
+  
+  //-------------------------------------------------------------------------------------------------------------
   bool MoveBase::makePlan(const geometry_msgs::PoseStamped& goal, std::vector<geometry_msgs::PoseStamped>& plan){
     boost::unique_lock<costmap_2d::Costmap2D::mutex_t> lock(*(planner_costmap_ros_->getCostmap()->getMutex()));
 
@@ -501,6 +474,7 @@ namespace move_base {
     return true;
   }
 
+  //--------------------------------------------------------------------------------------
   void MoveBase::publishZeroVelocity(){
     geometry_msgs::Twist cmd_vel;
     cmd_vel.linear.x = 0.0;
@@ -508,7 +482,8 @@ namespace move_base {
     cmd_vel.angular.z = 0.0;
     vel_pub_.publish(cmd_vel);
   }
-
+  
+  //--------------------------------------------------------------------------------------
   bool MoveBase::isQuaternionValid(const geometry_msgs::Quaternion& q){
     //first we need to check if the quaternion has nan's or infs
     if(!std::isfinite(q.x) || !std::isfinite(q.y) || !std::isfinite(q.z) || !std::isfinite(q.w)){
@@ -539,6 +514,7 @@ namespace move_base {
     return true;
   }
 
+  //--------------------------------------------------------------------------------------
   geometry_msgs::PoseStamped MoveBase::goalToGlobalFrame(const geometry_msgs::PoseStamped& goal_pose_msg){
     std::string global_frame = planner_costmap_ros_->getGlobalFrameID();
     geometry_msgs::PoseStamped goal_pose, global_pose;
@@ -560,12 +536,15 @@ namespace move_base {
     return global_pose;
   }
 
+  //--------------------------------------------------------------------------------------
   void MoveBase::wakePlanner(const ros::TimerEvent& event)
   {
     // we have slept long enough for rate
     planner_cond_.notify_one();
   }
 
+  //--------------------------------------------------------------------------------------
+  //全局规划线程，调用全局规划
   void MoveBase::planThread(){
     ROS_DEBUG_NAMED("move_base_plan_thread","Starting planner thread...");
     ros::NodeHandle n;
@@ -648,6 +627,8 @@ namespace move_base {
     }
   }
 
+  //--------------------------------------------------------------------------------------
+  //控制主体，收到目标后，出发全局规划线程，循环执行局部路径规划
   void MoveBase::executeCb(const move_base_msgs::MoveBaseGoalConstPtr& move_base_goal)
   {
     if(!isQuaternionValid(move_base_goal->target_pose.pose.orientation)){
@@ -794,11 +775,14 @@ namespace move_base {
     return;
   }
 
+  //--------------------------------------------------------------------------------------
   double MoveBase::distance(const geometry_msgs::PoseStamped& p1, const geometry_msgs::PoseStamped& p2)
   {
     return hypot(p1.pose.position.x - p2.pose.position.x, p1.pose.position.y - p2.pose.position.y);
   }
 
+  //--------------------------------------------------------------------------------------
+  //局部路径规划，传入全局路线，调用局部规划器类方法，得到速度控制指令
   bool MoveBase::executeCycle(geometry_msgs::PoseStamped& goal){
     boost::recursive_mutex::scoped_lock ecl(configuration_mutex_);
     //we need to be able to publish velocity commands
@@ -1016,6 +1000,8 @@ namespace move_base {
     return false;
   }
 
+  //--------------------------------------------------------------------------------------
+  //恢复行为
   bool MoveBase::loadRecoveryBehaviors(ros::NodeHandle node){
     XmlRpc::XmlRpcValue behavior_list;
     if(node.getParam("recovery_behaviors", behavior_list)){
@@ -1101,6 +1087,7 @@ namespace move_base {
     return true;
   }
 
+  //--------------------------------------------------------------------------------------
   //we'll load our default recovery behaviors here
   void MoveBase::loadDefaultRecoveryBehaviors(){
     recovery_behaviors_.clear();
@@ -1143,6 +1130,7 @@ namespace move_base {
     return;
   }
 
+  //--------------------------------------------------------------------------------------
   void MoveBase::resetState(){
     // Disable the planner thread
     boost::unique_lock<boost::recursive_mutex> lock(planner_mutex_);
@@ -1163,6 +1151,7 @@ namespace move_base {
     }
   }
 
+  //--------------------------------------------------------------------------------------
   bool MoveBase::getRobotPose(geometry_msgs::PoseStamped& global_pose, costmap_2d::Costmap2DROS* costmap)
   {
     tf2::toMsg(tf2::Transform::getIdentity(), global_pose.pose);
