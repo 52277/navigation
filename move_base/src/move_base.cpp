@@ -140,8 +140,9 @@ namespace move_base {
     //控制是否启用恢复行为，当机器人陷入困境时，启用恢复行为帮助其脱困。
     private_nh.param("recovery_behavior_enabled", recovery_behavior_enabled_, true);
 
-    //create the ros wrapper for the planner's costmap... and initializer a pointer we'll use with the underlying map
-    //为规划器的成本图创建 ros 包装器...并初始化我们将与底层映射一起使用的指针
+    //create the ros wrapper for the planner's costmap... 
+    //and initializer a pointer we'll use with the underlying map
+    //为规划器的成本图创建 ros 包装器...并初始化(我们将与底层映射一起使用的指针)
     planner_costmap_ros_ = new costmap_2d::Costmap2DROS("global_costmap", tf_);
     planner_costmap_ros_->pause();
 
