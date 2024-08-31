@@ -78,7 +78,7 @@ namespace move_base {
     private_nh.param("make_plan_add_unreachable_goal", make_plan_add_unreachable_goal_, true);
 
     //set up plan triple buffer
-    //设置三重缓冲区
+    //---------------------------设置三重缓冲区
     //存储由路径规划生成的路径
     planner_plan_ = new std::vector<geometry_msgs::PoseStamped>();
     //存储最新的路径
@@ -124,16 +124,24 @@ namespace move_base {
     //goal_sub_ 用于接收导航的目标，并将其传递给goalCB回调函数处理。
 
     //we'll assume the radius of the robot to be consistent with what's specified for the costmaps
+    //机器人内部的安全半径，默认值是0.325，机器人能够在不碰撞的情况下可以移动的最小半径
     private_nh.param("local_costmap/inscribed_radius", inscribed_radius_, 0.325);
+    //机器人外部的安全半径，即机器人绕开障碍物所需要的最小半径。
     private_nh.param("local_costmap/circumscribed_radius", circumscribed_radius_, 0.46);
+    //清除半径，默认值是机器人外部的安全半径
     private_nh.param("clearing_radius", clearing_radius_, circumscribed_radius_);
+    //代价地图在发生一定距离的运动后进行保守重置的距离。
     private_nh.param("conservative_reset_dist", conservative_reset_dist_, 3.0);
 
+    //控制是否在导航系统停止时关闭代价地图。默认是不关闭
     private_nh.param("shutdown_costmaps", shutdown_costmaps_, false);
+    //控制是否允许机器人在执行清理操作时旋转。
     private_nh.param("clearing_rotation_allowed", clearing_rotation_allowed_, true);
+    //控制是否启用恢复行为，当机器人陷入困境时，启用恢复行为帮助其脱困。
     private_nh.param("recovery_behavior_enabled", recovery_behavior_enabled_, true);
 
     //create the ros wrapper for the planner's costmap... and initializer a pointer we'll use with the underlying map
+    //为规划器的成本图创建 ros 包装器...并初始化我们将与底层映射一起使用的指针
     planner_costmap_ros_ = new costmap_2d::Costmap2DROS("global_costmap", tf_);
     planner_costmap_ros_->pause();
 
