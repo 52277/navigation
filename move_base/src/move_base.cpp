@@ -143,10 +143,18 @@ namespace move_base {
     //create the ros wrapper for the planner's costmap... 
     //and initializer a pointer we'll use with the underlying map
     //为规划器的成本图创建 ros 包装器...并初始化(我们将与底层映射一起使用的指针)
+
+    //全局规划器代价地图global_costmap_ros_
+    //planner_costmap_ros_是一个指向 costmap_2d::Costmap2DROS 对象的指针。
+    //Costmap2DROS 是 ROS 中用于处理 2D 代价地图的一个封装类，它提供了将传感器数据整合成代价地图的功能。
     planner_costmap_ros_ = new costmap_2d::Costmap2DROS("global_costmap", tf_);
+    //暂停代价地图的更新
+    //调用这个函数后，Costmap2DROS 不会处理新的传感器数据，也不会更新内部的代价地图。
+    //目的是在初始化过程中防止地图更新造成的不必要的计算负担，确保系统在初始化完成之前不会受到外部干扰。
     planner_costmap_ros_->pause();
 
     //initialize the global planner
+    //初始化全局规划器，planner_指针
     try {
       planner_ = bgp_loader_.createInstance(global_planner);
       planner_->initialize(bgp_loader_.getName(global_planner), planner_costmap_ros_);
