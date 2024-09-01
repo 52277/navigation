@@ -164,13 +164,15 @@ namespace move_base {
     }
 
     //create the ros wrapper for the controller's costmap... and initializer a pointer we'll use with the underlying map
+    //为控制器的 costmap 创建 ros 包装器...并初始化我们将与底层映射一起使用的指针
     controller_costmap_ros_ = new costmap_2d::Costmap2DROS("local_costmap", tf_);
     controller_costmap_ros_->pause();
 
     //create a local planner
+    //创建局部规划器, tc_指针
     try {
       tc_ = blp_loader_.createInstance(local_planner);
-      ROS_INFO("Created local_planner %s", local_planner.c_str());
+      ROS_INFO("Created local_planner %s", local_planner.c_str());//打印创建的局部规划器名称
       tc_->initialize(blp_loader_.getName(local_planner), &tf_, controller_costmap_ros_);
     } catch (const pluginlib::PluginlibException& ex) {
       ROS_FATAL("Failed to create the %s planner, are you sure it is properly registered and that the containing library is built? Exception: %s", local_planner.c_str(), ex.what());
@@ -178,16 +180,27 @@ namespace move_base {
     }
 
     // Start actively updating costmaps based on sensor data
+    //开始根据传感器数据主动更新成本图
+    //启动了两个代价地图对象
     planner_costmap_ros_->start();
     controller_costmap_ros_->start();
 
     //advertise a service for getting a plan
+    //发布一个服务用于获取路径规划
+    //发布make_plan服务，调用MoveBase类的planService方法来生成路径规划
+    //-----------------------------------------------planService方法---------------------------------
     make_plan_srv_ = private_nh.advertiseService("make_plan", &MoveBase::planService, this);
 
     //advertise a service for clearing the costmaps
+    //创建服务器用于清除代价地图
+    //-------------------------------clearCostmapsService-------------------------------------方法
+    //调用MoveBase类的clearCostmapsService方法来清除代价地图
     clear_costmaps_srv_ = private_nh.advertiseService("clear_costmaps", &MoveBase::clearCostmapsService, this);
 
     //if we shutdown our costmaps when we're deactivated... we'll do that now
+    //如果这个值为真，那么会在初始化时停止代价地图的更新。这可能用于减少初始阶段的计算负担
+    //或在特定的应用场景下，只有在需要时才激活代价地图。
+    //如果关闭了代价地图，就停止两个代价地图的更新
     if(shutdown_costmaps_){
       ROS_DEBUG_NAMED("move_base","Stopping costmaps initially");
       planner_costmap_ros_->stop();
@@ -195,6 +208,7 @@ namespace move_base {
     }
 
     //load any user specified recovery behaviors, and if that fails load the defaults
+    //加载任何用户指定的恢复行为，如果失败则加载默认行为
     if(!loadRecoveryBehaviors(private_nh)){
       loadDefaultRecoveryBehaviors();
     }
@@ -206,10 +220,17 @@ namespace move_base {
     recovery_index_ = 0;
 
     //we're all set up now so we can start the action server
+    //设置完成，启动action服务器
+    //as_是上边创建的MoveBaseActionServer对象指针，action服务器
     as_->start();
 
+    //动态重配置
     dsrv_ = new dynamic_reconfigure::Server<move_base::MoveBaseConfig>(ros::NodeHandle("~"));
-    dynamic_reconfigure::Server<move_base::MoveBaseConfig>::CallbackType cb = [this](auto& config, auto level){ reconfigureCB(config, level); };
+    //定义回调函数cb
+    //这个 lambda 表达式捕获当前对象 (this)，并将 config 和 level 作为参数传递给 reconfigureCB 函数。
+    //config 是 dynamic_reconfigure 服务器传递的配置参数，而 level 是表示哪些参数被修改的级别信息。
+    dynamic_reconfigure::Server<move_base::MoveBaseConfig>::CallbackType cb = 
+      [this](auto& config, auto level){ reconfigureCB(config, level); };
     dsrv_->setCallback(cb);
   }
 
