@@ -19,9 +19,10 @@ namespace move_base {
     blp_loader_("nav_core", "nav_core::BaseLocalPlanner"),  //加载了baseLocalPlanner的类库
     recovery_loader_("nav_core", "nav_core::RecoveryBehavior"), //加载了recoveryBehavior的类库
     planner_plan_(NULL), latest_plan_(NULL), controller_plan_(NULL),
-    runPlanner_(false), setup_(false), p_freq_change_(false), c_freq_change_(false), new_global_plan_(false) {
-
+    runPlanner_(false), setup_(false), p_freq_change_(false), c_freq_change_(false), new_global_plan_(false) 
+  {
     //新建action服务器----------------------------------------------------------------------------------------------
+    //回调函数是executeCb，它会在接收到目标时被调用。
     as_ = new MoveBaseActionServer(ros::NodeHandle(), "move_base", [this](auto& goal){ executeCb(goal); }, false);
     //as_ 是一个指向 MoveBaseActionServer 对象的指针。使用 new 操作符在堆上分配内存并创建一个 MoveBaseActionServer 实例。
     //"move_base" 是动作服务器的名称。其他 ROS 节点可以通过这个名字来与该动作服务器进行通信。
@@ -718,26 +719,39 @@ namespace move_base {
 
   //--------------------------------------------------------------------------------------
   //控制主体，收到目标后，出发全局规划线程，循环执行局部路径规划
+  //executeCb是Action的回调函数，它是MoveBase控制流的主体
+  //它调用了MoveBase内另外几个作为子部分的重要成员函数，先后完成了全局规划和局部规划。
+  //在函数的开始部分，它对Action收到的目标进行四元数检测、坐标系转换，然后将其设置为全局规划的目标，并设置了一些标志位。
+  //参数是MoveBaseGoalConstPtr类型的指针，表示Action收到的目标。
   void MoveBase::executeCb(const move_base_msgs::MoveBaseGoalConstPtr& move_base_goal)
   {
+    //验证四元数的有效性
+    //检测收到的目标位置的旋转四元数是否有效，若无效，直接返回
     if(!isQuaternionValid(move_base_goal->target_pose.pose.orientation)){
       as_->setAborted(move_base_msgs::MoveBaseResult(), "Aborting on goal because it was sent with an invalid quaternion");
       return;
     }
-
+    //将目标位置转换到global坐标系下（geometry_msgs形式）
     geometry_msgs::PoseStamped goal = goalToGlobalFrame(move_base_goal->target_pose);
 
+    //初始化
     publishZeroVelocity();
     //we have a goal so start the planner
+    //启动全局规划
     boost::unique_lock<boost::recursive_mutex> lock(planner_mutex_);
+    //用接收到的目标goal来更新全局变量，即全局规划目标，这个值在planThread中会被用来做全局规划的当前目标
     planner_goal_ = goal;
+    //全局规划标志位设置为真
     runPlanner_ = true;
+    //开始全局规划并在此处阻塞
     planner_cond_.notify_one();
     lock.unlock();
 
+    //发布目标
     current_goal_pub_.publish(goal);
 
     ros::Rate r(controller_frequency_);
+    ////如果代价地图是被关闭的，这里重启
     if(shutdown_costmaps_){
       ROS_DEBUG_NAMED("move_base","Starting up costmaps that were shut down previously");
       planner_costmap_ros_->start();
@@ -745,9 +759,13 @@ namespace move_base {
     }
 
     //we want to make sure that we reset the last time we had a valid plan and control
+    //上一次有效的局部规划时间设为现在
     last_valid_control_ = ros::Time::now();
+    //上一次有效的全局规划时间设为现在
     last_valid_plan_ = ros::Time::now();
+    //上一次震荡重置时间设为现在
     last_oscillation_reset_ = ros::Time::now();
+    //对同一目标的全局规划次数记录归为0
     planning_retries_ = 0;
 
     ros::NodeHandle n;
